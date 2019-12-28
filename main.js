@@ -5,151 +5,59 @@
 // pm2 start main.js --watch --no-daemon : pm2 log 를 합친 기능 (--no-daemon)
 // pm2 start main.js --watch --ignore-watch="data/*" --no-daemon : 파일을 수정하거나 삭제해도 노드가 재시작 되지 않음 (data 폴더 아래 모든 파일)
 // pm2 start main.js --watch --ignore-watch="data/* session/*" --no-daemon : 여러 폴더는 띄어쓰기 구분해서 사용할 수 있다.
-console.log('Hello no-deamon');
-var http = require('http');
-var fs = require('fs');
-var url = require('url');
-var qs = require('querystring');
-var path = require('path');
-var sanitizeHtml = require('sanitize-html');
 
+const http = require('http');
+const url = require('url');
+const mysql = require('mysql');
+const db = require('./lib/db');
+const topic = require('./lib/topic');
 const template = require('./lib/template');
+const author = require('./lib/author');
 
+// querystring 쓰는 이유: get 방식에서 쿼리 스트링을 객체 형식으로 파싱해준다. (ex: 링크 접속으로 받아온 쿼리스트링을 파싱)
+// url 쓰는 이유 : url에 요청된 데이터들을 기반으로 pathname, query 등을 객체로 파싱해준다.
 
 
 var app = http.createServer(function (request, response) {
-    var _url = request.url;
-    var queryData = url.parse(_url, true).query;
-    console.log('pathname: ', url.parse(request.url).pathname);
+
     if (url.parse(request.url, true).pathname === '/') {
+
         if (url.parse(request.url, true).query.id === undefined) {
-            fs.readdir('./data', (err, fileList) => {
-                var title = 'Welcome';
-                var data = 'Hello, Node.js';
-                var list = template.list(fileList);
-                var html = template.html(title, list,
-                    `<h2>${title}</h2><p>${data}</p>`,
-                    `<a href="/create">create</a>`);
-                response.writeHead(200);
-                response.end(html);
-            });
+            topic.home(request, response);
+
         } else {
-            var filteredPath = path.parse(queryData.id).base;
-            fs.readFile(`data/${filteredPath}`, 'utf8', (err, data) => {
-                fs.readdir('./data', (err, fileList) => {
-                    var title = queryData.id;
-                    var sanitizeTitle = sanitizeHtml(title);
-                    var sanitizeData = sanitizeHtml(data, {
-                        allowedTags: ['h1'],
-                    });
-                    var list = template.list(fileList);
-                    var html = template.html(sanitizeTitle, list,
-                        `<h2>${sanitizeTitle}</h2>${sanitizeData}`,
-                        `<a href="/create">create</a> 
-                                <a href="/update?id=${sanitizeTitle}">update</a>
-                                <form action="/delete_process" method="post">
-                                    <input type="hidden" name="id" value="${sanitizeTitle}">
-                                    <input type="submit" value="delete">
-                                </form>`);
-                    response.writeHead(200);
-                    response.end(html);
-                });
-            });
+            topic.page(request, response);
         }
+
     } else if (url.parse(request.url).pathname === '/create') {
-        fs.readdir('./data', (err, fileList) => {
-            var title = 'WEB - create';
-            var list = template.list(fileList);
-            var html = template.html(title, list,
-                `<form action="/create_process" method="post">
-                    <p><input type="text" name="title" placeholder="title"></p>
-                    <p>
-                        <textarea name="description" placeholder="description"></textarea>
-                    </p>
-                    <p>
-                        <input type="submit">
-                    </p>
-                </form>`,
-                ''
-            );
-            response.writeHead(200);
-            response.end(html);
-        });
+        topic.create(request, response);
+
     } else if (url.parse(request.url).pathname === '/create_process') {
-        var body = '';
-        request.on('data', (data) => {
-            console.log(`data: ${data}`);
-            body = body + data;
-        });
-        request.on('end', () => {
-            var post = qs.parse(body);
-            console.log(`post: ${JSON.stringify(post)}`);
-            const title = post.title;
-            const description = post.description;
-            fs.writeFile(`data/${title}`, description, 'utf8', (err) => {
-                response.writeHead(301, {Location: `/?id=${title}`});
-                response.end();
-            });
-        });
+        topic.create_process(request, response);
 
     } else if (url.parse(request.url).pathname === '/update') {
-        var filteredPath = path.parse(queryData.id).base;
-        fs.readFile(`data/${filteredPath}`, 'utf8', (err, data) => {
-            fs.readdir('./data', (err, fileList) => {
-                var title = queryData.id;
-                var list = template.list(fileList);
-                var html = template.html(title, list,
-                    `<form action="/update_process" method="post">
-                    <input type="hidden" name="id" value="${title}">
-                    <p><input type="text" name="title" placeholder="title" value="${title}"></p>
-                    <p>
-                        <textarea name="description" placeholder="description">${data}</textarea>
-                    </p>
-                    <p>
-                        <input type="submit">
-                    </p>
-                    </form>`,
-                    `<a href="/create">create</a> <a href="/update?id=${title}">update</a>`
-                );
-                response.writeHead(200);
-                response.end(html);
-            });
-        });
-    } else if (url.parse(request.url).pathname === '/update_process') {
-        var body = '';
-        request.on('data', (data) => {
-            body = body + data;
-        });
-        request.on('end', () => {
-            const post = qs.parse(body);
-            const id = post.id;
-            const title = post.title;
-            const description = post.description;
-            console.log(post);
-            fs.rename(`./data/${id}`, `./data/${title}`, (err) => {
-                fs.writeFile(`data/${title}`, description, 'utf8', (err) => {
-                    response.writeHead(301, {Location: `/?id=${title}`});
-                    response.end();
-                });
-            });
+        topic.update(request, response);
 
-        });
+    } else if (url.parse(request.url).pathname === '/update_process') {
+        topic.update_process(request, response);
 
     } else if (url.parse(request.url).pathname === '/delete_process') {
-        var body = '';
-        request.on('data', (data) => {
-            body = body + data;
-        });
-        request.on('end', () => {
-            const post = qs.parse(body);
-            const id = post.id;
-            const filteredPath = path.parse(id).base;
-            console.log(post);
-            fs.unlink(`data/${filteredPath}`, (err) => {
-                response.writeHead(301, {Location: `/`});
-                response.end();
-            });
-        });
+        topic.delete_process(request, response);
+
+    } else if (url.parse(request.url).pathname === '/author') {
+        author.home(request, response);
+
+    } else if (url.parse(request.url).pathname === '/author/create_process') {
+        author.create_process(request, response);
+
+    } else if (url.parse(request.url).pathname === '/author/update') {
+        author.update(request, response);
+
+    } else if (url.parse(request.url).pathname === '/author/update_process') {
+        author.update_process(request, response);
+
+    } else if (url.parse(request.url).pathname === '/author/delete_process') {
+        author.delete_process(request, response);
 
     } else {
         response.writeHead(404);
