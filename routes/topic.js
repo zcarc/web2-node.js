@@ -2,12 +2,18 @@ var path = require('path');
 var fs = require('fs');
 var sanitizeHtml = require('sanitize-html');
 const template = require('../lib/template');
+const auth = require('../lib/auth');
 
 const express = require('express');
 const router = express.Router();
 
 
 router.get('/create', (request, response) => {
+
+    if(!auth.isOwner(request, response)) {
+        response.redirect('/');
+        return false;
+    }
 
     var title = 'WEB - create';
     var list = template.list(request.list);
@@ -21,7 +27,8 @@ router.get('/create', (request, response) => {
                 <input type="submit">
             </p>
         </form>`,
-        ''
+        '',
+        auth.statusUI(request, response)
     );
 
     response.send(html);
@@ -29,6 +36,11 @@ router.get('/create', (request, response) => {
 
 
 router.post('/create_process', (request, response) => {
+
+    if(!auth.isOwner(request, response)) {
+        response.redirect('/');
+        return false;
+    }
 
     const post = request.body
     const title = post.title;
@@ -41,6 +53,11 @@ router.post('/create_process', (request, response) => {
 
 
 router.get('/update/:pageId', (request, response) => {
+
+    if(!auth.isOwner(request, response)) {
+        response.redirect('/');
+        return false;
+    }
 
     var filteredPath = path.parse(request.params.pageId).base;
     fs.readFile(`data/${filteredPath}`, 'utf8', (err, data) => {
@@ -57,7 +74,8 @@ router.get('/update/:pageId', (request, response) => {
                     <input type="submit">
                 </p>
                 </form>`,
-            `<a href="/topic/create">create</a>`
+            `<a href="/topic/create">create</a>`,
+            auth.statusUI(request, response)
         );
         response.send(html);
     });
@@ -65,6 +83,11 @@ router.get('/update/:pageId', (request, response) => {
 
 
 router.post('/update_process', (request, response) => {
+
+    if(!auth.isOwner(request, response)) {
+        response.redirect('/');
+        return false;
+    }
 
     const post = request.body;
     const id = post.id;
@@ -81,6 +104,11 @@ router.post('/update_process', (request, response) => {
 
 
 router.post('/delete_process', (request, response) => {
+
+    if(!auth.isOwner(request, response)) {
+        response.redirect('/');
+        return false;
+    }
 
     const post = request.body;
     const id = post.id;
@@ -115,7 +143,8 @@ router.get('/:pageId', (request, response, next) => {
                 <form action="/topic/delete_process" method="post">
                     <input type="hidden" name="id" value="${sanitizeTitle}">
                     <input type="submit" value="delete">
-                </form>`);
+                </form>`,
+                auth.statusUI(request, response));
     
             response.send(html);
         }

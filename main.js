@@ -4,6 +4,9 @@ const bodyParser = require('body-parser');
 const compression = require('compression')
 const topicRouter = require('./routes/topic');
 const indexRouter = require('./routes/index');
+const authRouter = require('./routes/auth');
+var session = require('express-session');
+var FileStore = require('session-file-store')(session);
 
 const helmet = require('helmet');
 
@@ -14,6 +17,13 @@ app.use(helmet());
 app.use(express.static('public'));
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(compression());
+
+app.use(session({
+    secret: 'sdfgohu94RGT430#$^',
+    resave: false,
+    saveUninitialized: true,
+    store: new FileStore(),
+  }));
 
 
 // app.use()를 사용하면 모든 라우터의 요청에 대해 readdir이 실행되는데
@@ -30,6 +40,7 @@ app.get('*', (request, response, next) => {
 
 app.use('/', indexRouter);
 app.use('/topic', topicRouter);
+app.use('/auth', authRouter);
 
 
 app.use(function (req, res, next) {
